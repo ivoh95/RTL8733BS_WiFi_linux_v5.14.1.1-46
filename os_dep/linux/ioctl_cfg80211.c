@@ -489,24 +489,26 @@ u8 rtw_cfg80211_ch_switch_notify(_adapter *adapter, u8 ch, u8 bw, u8 offset,
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 19, 0))
 	if (started) {
-#if defined(CONFIG_MLD_KERNEL_PATCH)
-		cfg80211_ch_switch_started_notify(adapter->pnetdev, &chdef, 0, 0, false);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)) && (LINUX_VERSION_CODE < KERNEL_VERSION(6, 9, 0))
+	cfg80211_ch_switch_started_notify(adapter->pnetdev, &chdef, 0, 0, false, punct_bitmap);
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0))
+	cfg80211_ch_switch_started_notify(adapter->pnetdev, &chdef, 0, 0, false);
 #elif (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0))
 
-		/* --- cfg80211_ch_switch_started_notfiy() ---
-		 *  A new parameter, bool quiet, is added from Linux kernel v5.11,
-		 *  to see if block-tx was requested by the AP. since currently,
-		 *  the API is used for station before connected in rtw_chk_start_clnt_join()
-		 *  the quiet is set to false here first. May need to refine it if
-		 *  called by others with block-tx.
-		 */
+	/* --- cfg80211_ch_switch_started_notfiy() ---
+		*  A new parameter, bool quiet, is added from Linux kernel v5.11,
+		*  to see if block-tx was requested by the AP. since currently,
+		*  the API is used for station before connected in rtw_chk_start_clnt_join()
+		*  the quiet is set to false here first. May need to refine it if
+		*  called by others with block-tx.
+		*/
 
-		cfg80211_ch_switch_started_notify(adapter->pnetdev, &chdef, 0, false);
+	cfg80211_ch_switch_started_notify(adapter->pnetdev, &chdef, 0, false);
 #else
-		cfg80211_ch_switch_started_notify(adapter->pnetdev, &chdef, 0);
+	cfg80211_ch_switch_started_notify(adapter->pnetdev, &chdef, 0);
 #endif
-		goto exit;
-	}
+	goto exit;
+}
 #endif
 
 	if (!rtw_cfg80211_allow_ch_switch_notify(adapter))
@@ -1185,7 +1187,7 @@ check_bss:
 		#endif
 
 		#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
-		#if defined(CONFIG_MLD_KERNEL_PATCH)
+		#if defined(CONFIG_MLD_KERNEL_PATCH) || LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0) || defined(CONFIG_ACK_5_15_LTS_KERNEL)
 		roam_info.links[0].bssid = cur_network->network.MacAddress;
 		#else	
 		roam_info.bssid = cur_network->network.MacAddress;
@@ -1959,7 +1961,7 @@ exit:
 }
 
 static int cfg80211_rtw_add_key(struct wiphy *wiphy, struct net_device *ndev
-#ifdef CONFIG_MLD_KERNEL_PATCH
+#if defined(CONFIG_MLD_KERNEL_PATCH) || (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)) || defined(CONFIG_ACK_5_15_LTS_KERNEL)
 	, int link_id
 #endif
 	, u8 key_index
@@ -2124,7 +2126,7 @@ addkey_end:
 }
 
 static int cfg80211_rtw_get_key(struct wiphy *wiphy, struct net_device *ndev
-#ifdef CONFIG_MLD_KERNEL_PATCH
+#if defined(CONFIG_MLD_KERNEL_PATCH) || (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)) || defined(CONFIG_ACK_5_15_LTS_KERNEL)
 	, int link_id
 #endif
 	, u8 keyid
@@ -2315,7 +2317,7 @@ exit:
 }
 
 static int cfg80211_rtw_del_key(struct wiphy *wiphy, struct net_device *ndev
-#ifdef CONFIG_MLD_KERNEL_PATCH
+#if defined(CONFIG_MLD_KERNEL_PATCH) || (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)) || defined(CONFIG_ACK_5_15_LTS_KERNEL)
 	, int link_id
 #endif
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 37)) || defined(COMPAT_KERNEL_RELEASE)
@@ -2338,7 +2340,7 @@ static int cfg80211_rtw_del_key(struct wiphy *wiphy, struct net_device *ndev
 }
 
 static int cfg80211_rtw_set_default_key(struct wiphy *wiphy, struct net_device *ndev
-#ifdef CONFIG_MLD_KERNEL_PATCH
+#if defined(CONFIG_MLD_KERNEL_PATCH) || (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)) || defined(CONFIG_ACK_5_15_LTS_KERNEL)
 	, int link_id
 #endif
 	, u8 key_index
@@ -2389,7 +2391,7 @@ static int cfg80211_rtw_set_default_key(struct wiphy *wiphy, struct net_device *
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 30))
 int cfg80211_rtw_set_default_mgmt_key(struct wiphy *wiphy, struct net_device *ndev
-#ifdef CONFIG_MLD_KERNEL_PATCH
+#if defined(CONFIG_MLD_KERNEL_PATCH) || (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)) || defined(CONFIG_ACK_5_15_LTS_KERNEL)
 	, int link_id
 #endif
 	, u8 key_index)
@@ -5615,9 +5617,16 @@ exit:
 	return ret;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 7, 0))
 static int cfg80211_rtw_change_beacon(struct wiphy *wiphy, struct net_device *ndev,
-		struct cfg80211_beacon_data *info)
+               struct cfg80211_ap_update *params)
 {
+       struct cfg80211_beacon_data *info = &params->beacon;
+#else
+ static int cfg80211_rtw_change_beacon(struct wiphy *wiphy, struct net_device *ndev,
+                struct cfg80211_beacon_data *info)
+{
+#endif
 	int ret = 0;
 	_adapter *adapter = (_adapter *)rtw_netdev_priv(ndev);
 
